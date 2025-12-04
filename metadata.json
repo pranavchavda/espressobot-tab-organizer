@@ -1,0 +1,5 @@
+{
+  "name": "EspressoBot Tab Organizer",
+  "description": "A React-based Chrome Extension popup that uses Gemini to intelligently categorize and group open tabs.",
+  "requestFramePermissions": []
+}
