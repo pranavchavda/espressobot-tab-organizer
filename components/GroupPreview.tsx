@@ -6,6 +6,7 @@ interface GroupPreviewProps {
   proposal: TabGroupProposal;
   allTabs: Tab[];
   onRemoveTab: (tabId: number, groupName: string) => void;
+  showColors: boolean;
 }
 
 const colorMap: Record<string, string> = {
@@ -19,7 +20,7 @@ const colorMap: Record<string, string> = {
   cyan: 'bg-cyan-500',
 };
 
-const GroupPreview: React.FC<GroupPreviewProps> = ({ proposal, allTabs, onRemoveTab }) => {
+const GroupPreview: React.FC<GroupPreviewProps> = ({ proposal, allTabs, onRemoveTab, showColors }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Filter tabs that belong to this group
@@ -35,7 +36,9 @@ const GroupPreview: React.FC<GroupPreviewProps> = ({ proposal, allTabs, onRemove
       >
         <div className="flex items-center gap-3">
           {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <div className={`w-3 h-3 rounded-full ${colorMap[proposal.color] || 'bg-slate-500'}`} />
+          {showColors && (
+            <div className={`w-3 h-3 rounded-full ${colorMap[proposal.color] || 'bg-slate-500'}`} />
+          )}
           <span className="font-semibold text-sm">{proposal.groupName}</span>
           <span className="text-xs text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
             {groupTabs.length}
