@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrainCircuit, Loader2, Sparkles, CheckCircle, AlertTriangle, Layers } from 'lucide-react';
-import { getOpenTabs, applyTabGroups } from './services/tabManager';
+import { getOpenTabs, applyTabGroups, getGroupingStrategy } from './services/tabManager';
 import { categorizeTabs } from './services/geminiService';
-import { Tab, TabGroupProposal, AppState } from './types';
+import { Tab, TabGroupProposal, AppState, GroupingStrategy } from './types';
 import GroupPreview from './components/GroupPreview';
 
 const App: React.FC = () => {
@@ -10,10 +10,12 @@ const App: React.FC = () => {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [proposals, setProposals] = useState<TabGroupProposal[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [strategy, setStrategy] = useState<GroupingStrategy>('unsupported');
 
   // Initial load of tabs
   useEffect(() => {
     loadTabs();
+    getGroupingStrategy().then(setStrategy);
   }, []);
 
   const loadTabs = async () => {
@@ -102,9 +104,16 @@ const App: React.FC = () => {
         ))}
       </div>
 
-      <button 
+      {strategy === 'unsupported' && (
+        <div className="w-full text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-800 rounded-lg p-2 text-center">
+          Tab grouping is not supported in this browser.
+        </div>
+      )}
+
+      <button
         onClick={handleAnalyze}
-        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2"
+        disabled={strategy === 'unsupported'}
+        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <BrainCircuit size={18} />
         Generate Stacks
@@ -129,11 +138,12 @@ const App: React.FC = () => {
       
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
         {proposals.map((group, idx) => (
-          <GroupPreview 
-            key={`${group.groupName}-${idx}`} 
-            proposal={group} 
-            allTabs={tabs} 
+          <GroupPreview
+            key={`${group.groupName}-${idx}`}
+            proposal={group}
+            allTabs={tabs}
             onRemoveTab={handleRemoveTabFromGroup}
+            showColors={strategy === 'chrome-groups'}
           />
         ))}
       </div>
