@@ -83,7 +83,12 @@ Rules:
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('No response from AI model.');
 
-  const result = JSON.parse(content) as GroupingResponse;
+  let result: GroupingResponse;
+  try {
+    result = JSON.parse(content) as GroupingResponse;
+  } catch {
+    throw new Error('AI returned invalid JSON. Try a different model or try again.');
+  }
   if (!result.groups || !Array.isArray(result.groups)) {
     throw new Error('Invalid response structure from AI model.');
   }

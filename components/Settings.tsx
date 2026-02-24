@@ -63,7 +63,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave, onBack }) => {
             className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
           <p className="text-xs text-slate-500 mt-1">
-            Any <a href="https://openrouter.ai/models" target="_blank" rel="noopener" className="text-blue-400 hover:underline">OpenRouter model</a>. Default: {DEFAULT_MODEL}
+            Any <a href="https://openrouter.ai/models" target="_blank" rel="noopener" className="text-blue-400 hover:underline">OpenRouter model</a> that supports structured output. Default: {DEFAULT_MODEL}
           </p>
         </div>
       </div>

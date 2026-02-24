@@ -74,9 +74,15 @@ const App: React.FC = () => {
   };
 
   const handleSaveSettings = async (newSettings: Settings) => {
-    await saveSettings(newSettings);
-    setSettings(newSettings);
-    setAppState(AppState.IDLE);
+    try {
+      await saveSettings(newSettings);
+      setSettings(newSettings);
+      setAppState(AppState.IDLE);
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("Failed to save settings.");
+      setAppState(AppState.ERROR);
+    }
   };
 
   // --- Render Views ---
