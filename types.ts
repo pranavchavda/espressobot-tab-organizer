@@ -21,7 +21,15 @@ export enum AppState {
   REVIEW = 'REVIEW',
   APPLYING = 'APPLYING',
   SUCCESS = 'SUCCESS',
-  ERROR = 'ERROR'
+  ERROR = 'ERROR',
+  SETTINGS = 'SETTINGS'
 }
 
 export type GroupingStrategy = 'chrome-groups' | 'vivaldi-stacks' | 'unsupported';
+
+export interface Settings {
+  apiKey: string;
+  model: string;
+}
+
+export const DEFAULT_MODEL = 'google/gemini-3.0-flash';

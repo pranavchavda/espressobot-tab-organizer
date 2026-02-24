@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-EspressoBot Tab Organizer is a Chrome/Edge/Vivaldi browser extension that uses Gemini AI to intelligently categorize and group open browser tabs into logical groups based on their content, domain, and context.
+EspressoBot Tab Organizer is a Chrome/Edge/Vivaldi browser extension that uses AI (via OpenRouter) to intelligently categorize and group open browser tabs into logical groups based on their content, domain, and context.
 
 ## Development Commands
 
@@ -24,22 +24,24 @@ pnpm preview
 
 ## Environment Setup
 
-Set `GEMINI_API_KEY` in `.env.local` with your Google Gemini API key. The key is injected at build time via Vite's `define` config.
+Optionally set `OPENROUTER_API_KEY` in `.env.local` to pre-fill the API key. This is injected at build time via Vite's `define` config. Users can also configure their OpenRouter API key and model directly in the extension's settings UI (gear icon in the popup header).
 
 ## Architecture
 
 ### Core Flow
 1. **Tab Retrieval** (`services/tabManager.ts`) - Gets open browser tabs via Chrome Extension API, falls back to mock data for web preview
-2. **AI Analysis** (`services/geminiService.ts`) - Sends tab data to Gemini 2.5 Flash with structured output schema for grouping proposals
+2. **AI Analysis** (`services/aiService.ts`) - Sends tab data to OpenRouter API (default model: `google/gemini-3.0-flash`) with structured JSON schema for grouping proposals
 3. **User Review** (`App.tsx`) - State machine handles IDLE → ANALYZING → REVIEW → APPLYING → SUCCESS/ERROR flow
 4. **Apply Groups** (`services/tabManager.ts`) - Detects browser and uses `chrome.tabs.group()` on Chrome/Edge or `vivExtData` tab stacking on Vivaldi
 
 ### Key Files
 - `App.tsx` - Main React component with state machine (AppState enum)
 - `types.ts` - TypeScript interfaces for Tab, TabGroupProposal, AppState, GroupingStrategy
-- `services/geminiService.ts` - Gemini API integration with JSON schema for structured responses
+- `services/aiService.ts` - OpenRouter API integration with JSON schema for structured responses
+- `services/settingsService.ts` - Settings persistence via chrome.storage.local (extension) or localStorage (web)
 - `services/tabManager.ts` - Chrome Extension API wrapper with mock fallback
 - `components/GroupPreview.tsx` - Collapsible group preview with tab removal
+- `components/Settings.tsx` - Settings UI for API key and model configuration
 
 ### Extension vs Web Mode
 The app detects `chrome.tabs` availability. When running as extension, uses real browser APIs. When running in web browser (dev mode), uses mock tab data defined in `tabManager.ts`.
