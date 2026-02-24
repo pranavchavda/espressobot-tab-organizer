@@ -10,7 +10,7 @@ const App: React.FC = () => {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [proposals, setProposals] = useState<TabGroupProposal[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>('');
-  const [strategy, setStrategy] = useState<GroupingStrategy>('unsupported');
+  const [strategy, setStrategy] = useState<GroupingStrategy | null>(null);
 
   // Initial load of tabs
   useEffect(() => {
@@ -104,7 +104,7 @@ const App: React.FC = () => {
         ))}
       </div>
 
-      {strategy === 'unsupported' && (
+      {strategy !== null && strategy === 'unsupported' && (
         <div className="w-full text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-800 rounded-lg p-2 text-center">
           Tab grouping is not supported in this browser.
         </div>
@@ -112,7 +112,7 @@ const App: React.FC = () => {
 
       <button
         onClick={handleAnalyze}
-        disabled={strategy === 'unsupported'}
+        disabled={strategy === null || strategy === 'unsupported'}
         className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <BrainCircuit size={18} />
@@ -143,7 +143,7 @@ const App: React.FC = () => {
             proposal={group}
             allTabs={tabs}
             onRemoveTab={handleRemoveTabFromGroup}
-            showColors={strategy === 'chrome-groups'}
+            showColors={strategy === 'chrome-groups' || strategy === null}
           />
         ))}
       </div>

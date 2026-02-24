@@ -2,13 +2,14 @@
 // This persists longer than the popup context
 
 let groupingStrategy = null;
+let detectionPromise = null;
 
 async function detectStrategy() {
   if (typeof chrome.tabGroups !== 'undefined') {
     groupingStrategy = 'chrome-groups';
   } else {
     try {
-      const tabs = await chrome.tabs.query({ currentWindow: true, maxResults: 1 });
+      const tabs = await chrome.tabs.query({ currentWindow: true });
       if (tabs.length > 0 && tabs[0].vivExtData !== undefined) {
         groupingStrategy = 'vivaldi-stacks';
       } else {
@@ -21,12 +22,12 @@ async function detectStrategy() {
   console.log('[TabOrganizer BG] Detected grouping strategy:', groupingStrategy);
 }
 
-detectStrategy();
+detectionPromise = detectStrategy();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getStrategy') {
     (async () => {
-      if (!groupingStrategy) await detectStrategy();
+      if (!groupingStrategy) await detectionPromise;
       sendResponse({ success: true, strategy: groupingStrategy });
     })();
     return true;
@@ -101,11 +102,6 @@ async function applyTabGroups(groups) {
   }
 
   if (groupingStrategy === 'chrome-groups') {
-    const granted = await chrome.permissions.contains({ permissions: ['tabGroups'] });
-    if (!granted) {
-      await chrome.permissions.request({ permissions: ['tabGroups'] });
-    }
-    // existing Chrome path
     for (const group of groups) {
       if (!group.tabIds || group.tabIds.length === 0) continue;
       console.log(`[TabOrganizer BG] Creating group "${group.groupName}" with tabs:`, group.tabIds);
