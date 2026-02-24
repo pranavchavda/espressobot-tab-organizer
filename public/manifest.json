@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "EspressoBot Tab Organizer",
   "version": "1.0.0",
-  "description": "Intelligently categorize and group open tabs using Gemini AI.",
+  "description": "Intelligently categorize and group open tabs using AI.",
   "permissions": [
     "tabs",
     "storage"
