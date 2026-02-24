@@ -88,8 +88,7 @@ async function applyTabGroupsVivaldi(groups) {
         vivExtData.fixedGroupTitle = group.groupName;
         await chrome.tabs.update(tabId, { vivExtData: JSON.stringify(vivExtData) });
       } catch (err) {
-        console.error(`[TabOrganizer BG] Error stacking tab ${tabId}:`, err);
-        throw err;
+        console.warn(`[TabOrganizer BG] Skipping missing tab ${tabId}:`, err.message);
       }
     }
   }
@@ -106,11 +105,16 @@ async function applyTabGroups(groups) {
   }
 
   if (groupingStrategy === 'chrome-groups') {
+    // Filter out tabs that no longer exist before grouping
+    const existingTabs = await chrome.tabs.query({ currentWindow: true });
+    const existingIds = new Set(existingTabs.map(t => t.id));
+
     for (const group of groups) {
-      if (!group.tabIds || group.tabIds.length === 0) continue;
-      console.log(`[TabOrganizer BG] Creating group "${group.groupName}" with tabs:`, group.tabIds);
+      const validIds = (group.tabIds || []).filter(id => existingIds.has(id));
+      if (validIds.length === 0) continue;
+      console.log(`[TabOrganizer BG] Creating group "${group.groupName}" with tabs:`, validIds);
       try {
-        const groupId = await chrome.tabs.group({ tabIds: group.tabIds });
+        const groupId = await chrome.tabs.group({ tabIds: validIds });
         console.log(`[TabOrganizer BG] Created group with ID: ${groupId}`);
         if (chrome.tabGroups && chrome.tabGroups.update) {
           await chrome.tabGroups.update(groupId, {
