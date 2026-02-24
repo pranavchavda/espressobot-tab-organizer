@@ -54,9 +54,9 @@ The extension detects browser capabilities at runtime via `GroupingStrategy`:
 | Vivaldi | `vivaldi-stacks` | `chrome.tabs.update()` with `vivExtData.group` (UUID) + `vivExtData.fixedGroupTitle` |
 | Other | `unsupported` | UI shows warning, button disabled |
 
-Detection runs in `background.js` at startup: checks `chrome.tabGroups` existence first (Chrome/Edge), then probes a tab for `vivExtData` (Vivaldi). The popup queries the strategy via `getStrategy` message.
+Detection runs in `background.js` at startup: checks `chrome.tabGroups` existence first (Chrome/Edge), then probes a tab for `splitViewId` which is a Vivaldi-only property. The popup queries the strategy via `getStrategy` message.
 
-Vivaldi Tab Stacks don't support colors, so color dots are hidden in the review UI when on Vivaldi.
+Vivaldi Tab Stacks don't support colors, so color dots are hidden in the review UI when on Vivaldi. Note: `vivExtData` is not returned by `chrome.tabs.query()` in newer Vivaldi versions, but can still be written via `chrome.tabs.update()`.
 
 ## Browser Extension Details
 
