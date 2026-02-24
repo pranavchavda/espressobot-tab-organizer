@@ -1,4 +1,4 @@
-import { Tab } from '../types';
+import { Tab, GroupingStrategy } from '../types';
 
 declare var chrome: any;
 
@@ -45,6 +45,7 @@ export const getOpenTabs = async (): Promise<Tab[]> => {
           t.url &&
           !t.url.startsWith('chrome://') &&
           !t.url.startsWith('edge://') &&
+          !t.url.startsWith('vivaldi://') &&
           !t.url.startsWith('about:') &&
           !t.url.startsWith('chrome-extension://')
         );
@@ -56,6 +57,20 @@ export const getOpenTabs = async (): Promise<Tab[]> => {
   // Fallback for web preview
   console.warn('[TabOrganizer] Chrome API not found. Using mock data.');
   return Promise.resolve(MOCK_TABS);
+};
+
+export const getGroupingStrategy = async (): Promise<GroupingStrategy> => {
+  if (hasExtensionRuntime()) {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getStrategy' });
+      if (response?.success) {
+        return response.strategy;
+      }
+    } catch (err) {
+      console.warn('[TabOrganizer] Failed to get strategy:', err);
+    }
+  }
+  return 'unsupported';
 };
 
 export const applyTabGroups = async (groups: { groupName: string; tabIds: number[]; color: string }[]): Promise<void> => {

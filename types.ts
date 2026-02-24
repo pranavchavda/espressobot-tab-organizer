@@ -23,3 +23,5 @@ export enum AppState {
   SUCCESS = 'SUCCESS',
   ERROR = 'ERROR'
 }
+
+export type GroupingStrategy = 'chrome-groups' | 'vivaldi-stacks' | 'unsupported';

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-EspressoBot Tab Organizer is a Chrome/Edge browser extension that uses Gemini AI to intelligently categorize and group open browser tabs into logical groups based on their content, domain, and context.
+EspressoBot Tab Organizer is a Chrome/Edge/Vivaldi browser extension that uses Gemini AI to intelligently categorize and group open browser tabs into logical groups based on their content, domain, and context.
 
 ## Development Commands
 
@@ -32,11 +32,11 @@ Set `GEMINI_API_KEY` in `.env.local` with your Google Gemini API key. The key is
 1. **Tab Retrieval** (`services/tabManager.ts`) - Gets open browser tabs via Chrome Extension API, falls back to mock data for web preview
 2. **AI Analysis** (`services/geminiService.ts`) - Sends tab data to Gemini 2.5 Flash with structured output schema for grouping proposals
 3. **User Review** (`App.tsx`) - State machine handles IDLE → ANALYZING → REVIEW → APPLYING → SUCCESS/ERROR flow
-4. **Apply Groups** (`services/tabManager.ts`) - Uses `chrome.tabs.group()` and `chrome.tabGroups.update()` to create named tab groups
+4. **Apply Groups** (`services/tabManager.ts`) - Detects browser and uses `chrome.tabs.group()` on Chrome/Edge or `vivExtData` tab stacking on Vivaldi
 
 ### Key Files
 - `App.tsx` - Main React component with state machine (AppState enum)
-- `types.ts` - TypeScript interfaces for Tab, TabGroupProposal, AppState
+- `types.ts` - TypeScript interfaces for Tab, TabGroupProposal, AppState, GroupingStrategy
 - `services/geminiService.ts` - Gemini API integration with JSON schema for structured responses
 - `services/tabManager.ts` - Chrome Extension API wrapper with mock fallback
 - `components/GroupPreview.tsx` - Collapsible group preview with tab removal
@@ -44,11 +44,25 @@ Set `GEMINI_API_KEY` in `.env.local` with your Google Gemini API key. The key is
 ### Extension vs Web Mode
 The app detects `chrome.tabs` availability. When running as extension, uses real browser APIs. When running in web browser (dev mode), uses mock tab data defined in `tabManager.ts`.
 
+## Browser Compatibility
+
+The extension detects browser capabilities at runtime via `GroupingStrategy`:
+
+| Browser | Strategy | Method |
+|---------|----------|--------|
+| Chrome / Edge | `chrome-groups` | `chrome.tabs.group()` + `chrome.tabGroups.update()` |
+| Vivaldi | `vivaldi-stacks` | `chrome.tabs.update()` with `vivExtData.group` (UUID) + `vivExtData.fixedGroupTitle` |
+| Other | `unsupported` | UI shows warning, button disabled |
+
+Detection runs in `background.js` at startup: checks `chrome.tabGroups` existence first (Chrome/Edge), then probes a tab for `vivExtData` (Vivaldi). The popup queries the strategy via `getStrategy` message.
+
+Vivaldi Tab Stacks don't support colors, so color dots are hidden in the review UI when on Vivaldi.
+
 ## Browser Extension Details
 
-- **Manifest V3** extension with `tabs` and `tabGroups` permissions
+- **Manifest V3** extension with `tabs` permission and `tabGroups` as optional
 - Popup dimensions: 400x600px (set in `index.html` body class)
-- Filters out internal pages (chrome://, edge://, about:, chrome-extension://)
+- Filters out internal pages (chrome://, edge://, vivaldi://, about:, chrome-extension://)
 - Excludes pinned tabs from grouping
 
 ## Styling
