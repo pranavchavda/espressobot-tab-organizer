@@ -5,8 +5,10 @@
   "description": "Intelligently categorize and group open tabs using Gemini AI.",
   "permissions": [
     "tabs",
-    "tabGroups",
     "storage"
+  ],
+  "optional_permissions": [
+    "tabGroups"
   ],
   "host_permissions": [
     "<all_urls>"

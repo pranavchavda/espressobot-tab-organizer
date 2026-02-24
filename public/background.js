@@ -101,6 +101,10 @@ async function applyTabGroups(groups) {
   }
 
   if (groupingStrategy === 'chrome-groups') {
+    const granted = await chrome.permissions.contains({ permissions: ['tabGroups'] });
+    if (!granted) {
+      await chrome.permissions.request({ permissions: ['tabGroups'] });
+    }
     // existing Chrome path
     for (const group of groups) {
       if (!group.tabIds || group.tabIds.length === 0) continue;
