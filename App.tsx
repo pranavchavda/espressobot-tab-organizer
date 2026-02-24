@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, Loader2, Sparkles, CheckCircle, AlertTriangle, Layers } from 'lucide-react';
+import { BrainCircuit, Loader2, Sparkles, CheckCircle, AlertTriangle, Layers, Settings as SettingsIcon } from 'lucide-react';
 import { getOpenTabs, applyTabGroups, getGroupingStrategy } from './services/tabManager';
-import { categorizeTabs } from './services/geminiService';
-import { Tab, TabGroupProposal, AppState, GroupingStrategy } from './types';
+import { categorizeTabs } from './services/aiService';
+import { loadSettings, saveSettings } from './services/settingsService';
+import SettingsComponent from './components/Settings';
+import { Tab, TabGroupProposal, AppState, GroupingStrategy, Settings } from './types';
 import GroupPreview from './components/GroupPreview';
 
 const App: React.FC = () => {
@@ -11,11 +13,13 @@ const App: React.FC = () => {
   const [proposals, setProposals] = useState<TabGroupProposal[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [strategy, setStrategy] = useState<GroupingStrategy | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
 
   // Initial load of tabs
   useEffect(() => {
     loadTabs();
     getGroupingStrategy().then(setStrategy);
+    loadSettings().then(setSettings);
   }, []);
 
   const loadTabs = async () => {
@@ -32,12 +36,12 @@ const App: React.FC = () => {
     setAppState(AppState.ANALYZING);
     setErrorMsg('');
     try {
-      const groups = await categorizeTabs(tabs);
+      const groups = await categorizeTabs(tabs, settings!);
       setProposals(groups);
       setAppState(AppState.REVIEW);
     } catch (error) {
       console.error(error);
-      setErrorMsg("Failed to analyze tabs using Gemini.");
+      setErrorMsg(error instanceof Error ? error.message : "Failed to analyze tabs.");
       setAppState(AppState.ERROR);
     }
   };
@@ -69,6 +73,12 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleSaveSettings = async (newSettings: Settings) => {
+    await saveSettings(newSettings);
+    setSettings(newSettings);
+    setAppState(AppState.IDLE);
+  };
+
   // --- Render Views ---
 
   const renderHeader = () => (
@@ -76,10 +86,17 @@ const App: React.FC = () => {
       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg">
         <Sparkles size={18} className="text-white" />
       </div>
-      <div>
+      <div className="flex-1">
         <h1 className="font-bold text-lg leading-tight text-white">EspressoBot Tab Organizer</h1>
-        <p className="text-xs text-slate-400">Powered by Gemini AI</p>
+        <p className="text-xs text-slate-400">Powered by AI</p>
       </div>
+      <button
+        onClick={() => setAppState(AppState.SETTINGS)}
+        className="text-slate-400 hover:text-white transition-colors p-1"
+        aria-label="Settings"
+      >
+        <SettingsIcon size={18} />
+      </button>
     </div>
   );
 
@@ -104,6 +121,16 @@ const App: React.FC = () => {
         ))}
       </div>
 
+      {settings && !settings.apiKey && (
+        <div className="w-full text-xs text-blue-400 bg-blue-900/20 border border-blue-800 rounded-lg p-2 text-center">
+          No API key configured.{' '}
+          <button onClick={() => setAppState(AppState.SETTINGS)} className="underline hover:text-blue-300">
+            Open settings
+          </button>{' '}
+          to get started.
+        </div>
+      )}
+
       {strategy !== null && strategy === 'unsupported' && (
         <div className="w-full text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-800 rounded-lg p-2 text-center">
           Tab grouping is not supported in this browser.
@@ -112,7 +139,7 @@ const App: React.FC = () => {
 
       <button
         onClick={handleAnalyze}
-        disabled={strategy === null || strategy === 'unsupported'}
+        disabled={strategy === null || strategy === 'unsupported' || !settings?.apiKey}
         className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <BrainCircuit size={18} />
@@ -125,7 +152,7 @@ const App: React.FC = () => {
     <div className="flex flex-col h-full justify-center items-center p-8 text-center space-y-4">
       <Loader2 size={48} className="animate-spin text-blue-500" />
       <h3 className="text-lg font-medium">Analyzing Context...</h3>
-      <p className="text-sm text-slate-400">Gemini is looking at your tab titles and URLs to find patterns.</p>
+      <p className="text-sm text-slate-400">AI is analyzing your tab titles and URLs to find patterns.</p>
     </div>
   );
 
@@ -198,6 +225,13 @@ const App: React.FC = () => {
           appState === AppState.SUCCESS ? renderSuccess() : renderLoading()
         )}
         {appState === AppState.ERROR && renderError()}
+        {appState === AppState.SETTINGS && settings && (
+          <SettingsComponent
+            settings={settings}
+            onSave={handleSaveSettings}
+            onBack={() => setAppState(AppState.IDLE)}
+          />
+        )}
       </main>
     </div>
   );
