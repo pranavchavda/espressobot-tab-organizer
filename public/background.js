@@ -5,21 +5,25 @@ let groupingStrategy = null;
 let detectionPromise = null;
 
 async function detectStrategy() {
+  // Chrome/Edge: chrome.tabGroups API exists
   if (typeof chrome.tabGroups !== 'undefined') {
     groupingStrategy = 'chrome-groups';
-  } else {
-    try {
-      const tabs = await chrome.tabs.query({ currentWindow: true });
-      if (tabs.length > 0 && tabs[0].vivExtData !== undefined) {
-        groupingStrategy = 'vivaldi-stacks';
-      } else {
-        groupingStrategy = 'unsupported';
-      }
-    } catch {
+    console.log('[TabOrganizer BG] Detected strategy:', groupingStrategy);
+    return;
+  }
+
+  // Vivaldi: tabs have splitViewId (Vivaldi-only property)
+  try {
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    if (tabs.length > 0 && 'splitViewId' in tabs[0]) {
+      groupingStrategy = 'vivaldi-stacks';
+    } else {
       groupingStrategy = 'unsupported';
     }
+  } catch {
+    groupingStrategy = 'unsupported';
   }
-  console.log('[TabOrganizer BG] Detected grouping strategy:', groupingStrategy);
+  console.log('[TabOrganizer BG] Detected strategy:', groupingStrategy);
 }
 
 detectionPromise = detectStrategy();
