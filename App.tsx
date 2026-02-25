@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrainCircuit, Loader2, Sparkles, CheckCircle, AlertTriangle, Layers, Settings as SettingsIcon } from 'lucide-react';
 import { getOpenTabs, applyTabGroups, getGroupingStrategy } from './services/tabManager';
-import { categorizeTabs } from './services/aiService';
+import { categorizeTabs, checkAnalysisStatus, resetAnalysisStatus } from './services/aiService';
 import { loadSettings, saveSettings } from './services/settingsService';
 import SettingsComponent from './components/Settings';
 import { Tab, TabGroupProposal, AppState, GroupingStrategy, Settings } from './types';
@@ -20,7 +20,43 @@ const App: React.FC = () => {
     loadTabs();
     getGroupingStrategy().then(setStrategy);
     loadSettings().then(setSettings);
+
+    // Check if there is an ongoing or finished background analysis
+    checkAnalysisStatus().then(({ status, proposals, error }) => {
+      if (status === 'analyzing') {
+        setAppState(AppState.ANALYZING);
+      } else if (status === 'success' && proposals && proposals.length > 0) {
+        setProposals(proposals);
+        setAppState(AppState.REVIEW);
+      } else if (status === 'error') {
+        setErrorMsg(error || 'Failed to analyze tabs in background.');
+        setAppState(AppState.ERROR);
+      }
+    });
   }, []);
+
+  useEffect(() => {
+    let interval: number;
+    if (appState === AppState.ANALYZING) {
+      interval = window.setInterval(async () => {
+        try {
+          const { status, proposals, error } = await checkAnalysisStatus();
+          if (status === 'success' && proposals) {
+            setProposals(proposals);
+            setAppState(AppState.REVIEW);
+            await resetAnalysisStatus();
+          } else if (status === 'error') {
+            setErrorMsg(error || 'Analysis failed.');
+            setAppState(AppState.ERROR);
+            await resetAnalysisStatus();
+          }
+        } catch (e) {
+          // Silent fallback
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [appState]);
 
   const loadTabs = async () => {
     try {
@@ -35,10 +71,15 @@ const App: React.FC = () => {
   const handleAnalyze = async () => {
     setAppState(AppState.ANALYZING);
     setErrorMsg('');
+    await resetAnalysisStatus(); // clear any previous state
     try {
       const groups = await categorizeTabs(tabs, settings!);
-      setProposals(groups);
-      setAppState(AppState.REVIEW);
+      // If we got direct groups (fallback web mode), use them directly
+      if (groups && groups.length > 0) {
+        setProposals(groups);
+        setAppState(AppState.REVIEW);
+      }
+      // Otherwise, the interval will poll for the background result
     } catch (error) {
       console.error(error);
       setErrorMsg(error instanceof Error ? error.message : "Failed to analyze tabs.");
@@ -51,7 +92,7 @@ const App: React.FC = () => {
     try {
       await applyTabGroups(proposals);
       setAppState(AppState.SUCCESS);
-      
+
       // Reset after a delay
       setTimeout(() => {
         setAppState(AppState.IDLE);
@@ -114,15 +155,15 @@ const App: React.FC = () => {
       <div>
         <h2 className="text-xl font-bold mb-2">Organize your Tabs</h2>
         <p className="text-slate-400 text-sm">
-          You have <span className="text-white font-bold">{tabs.length}</span> tabs open. 
+          You have <span className="text-white font-bold">{tabs.length}</span> tabs open.
           Let AI analyze and stack them for you.
         </p>
       </div>
-      
+
       <div className="w-full max-h-[200px] overflow-y-auto bg-slate-800/50 rounded-lg p-2 text-left border border-slate-700">
         {tabs.map(t => (
           <div key={t.id} className="text-xs text-slate-400 truncate py-1 border-b border-slate-700/50 last:border-0">
-             • {t.title}
+            • {t.title}
           </div>
         ))}
       </div>
@@ -168,7 +209,7 @@ const App: React.FC = () => {
         <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-1">Proposed Stacks</h2>
         <p className="text-xs text-slate-500">Review the groups before applying.</p>
       </div>
-      
+
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
         {proposals.map((group, idx) => (
           <GroupPreview
@@ -182,13 +223,13 @@ const App: React.FC = () => {
       </div>
 
       <div className="p-4 border-t border-slate-700 bg-slate-800 flex gap-3">
-        <button 
+        <button
           onClick={() => setAppState(AppState.IDLE)}
           className="flex-1 py-2 px-4 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors text-sm font-medium"
         >
           Cancel
         </button>
-        <button 
+        <button
           onClick={handleApply}
           className="flex-[2] py-2 px-4 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors shadow-lg shadow-green-900/20 text-sm font-medium"
         >
@@ -211,7 +252,7 @@ const App: React.FC = () => {
       <AlertTriangle size={64} className="text-red-500" />
       <h3 className="text-xl font-bold">Something went wrong</h3>
       <p className="text-sm text-slate-400">{errorMsg || "An unknown error occurred."}</p>
-      <button 
+      <button
         onClick={() => setAppState(AppState.IDLE)}
         className="mt-4 px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white text-sm"
       >

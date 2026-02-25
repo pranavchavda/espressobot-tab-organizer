@@ -1,5 +1,7 @@
 import { Tab, TabGroupProposal, GroupingResponse, Settings } from '../types';
 
+declare var chrome: any;
+
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const jsonSchema = {
@@ -39,6 +41,24 @@ const jsonSchema = {
 export const categorizeTabs = async (tabs: Tab[], settings: Settings): Promise<TabGroupProposal[]> => {
   if (!tabs.length) return [];
   if (!settings.apiKey) throw new Error('No API key configured. Open settings to add your OpenRouter API key.');
+
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { action: 'startCategorization', tabs, settings },
+        (response: any) => {
+          if (chrome.runtime.lastError) {
+            return reject(new Error(chrome.runtime.lastError.message));
+          }
+          if (response?.success) {
+            resolve([]); // We return empty array because checking status happens asynchronously via polling
+          } else {
+            reject(new Error(response?.error || 'Failed to start categorization in background.'));
+          }
+        }
+      );
+    });
+  }
 
   const tabData = tabs.map(t => ({ id: t.id, title: t.title, url: t.url }));
 
@@ -93,4 +113,31 @@ Rules:
     throw new Error('Invalid response structure from AI model.');
   }
   return result.groups;
+};
+
+export const checkAnalysisStatus = async (): Promise<{ status: string, proposals?: TabGroupProposal[], error?: string }> => {
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action: 'getCategorizationStatus' }, (response: any) => {
+        if (chrome.runtime.lastError) {
+          return reject(new Error(chrome.runtime.lastError.message));
+        }
+        resolve(response || { status: 'idle' });
+      });
+    });
+  }
+  return { status: 'idle' }; // fallback for web preview
+};
+
+export const resetAnalysisStatus = async (): Promise<void> => {
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action: 'resetCategorizationStatus' }, (response: any) => {
+        if (chrome.runtime.lastError) {
+          return reject(new Error(chrome.runtime.lastError.message));
+        }
+        resolve();
+      });
+    });
+  }
 };
