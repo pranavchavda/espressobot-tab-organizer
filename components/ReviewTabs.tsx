@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 
-interface Tab {
+interface ReviewTabDescriptor {
   id: string;
   label: string;
   count: number;
 }
 
 interface ReviewTabsProps {
-  tabs: Tab[];
+  tabs: ReviewTabDescriptor[];
   children: React.ReactNode[];
 }
 
@@ -37,7 +37,7 @@ const ReviewTabs: React.FC<ReviewTabsProps> = ({ tabs, children }) => {
         ))}
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {children[activeIdx]}
+        {children[activeIdx] ?? null}
       </div>
     </div>
   );
