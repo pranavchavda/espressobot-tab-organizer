@@ -72,6 +72,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep channel open for async response
   }
 
+  if (message.action === 'applyCleanup') {
+    applyCleanup(message.tabIdsToClose, message.groups)
+      .then(() => sendResponse({ success: true }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
   if (message.action === 'getTabs') {
     getOpenTabs()
       .then((tabs) => sendResponse({ success: true, tabs }))
@@ -184,7 +191,8 @@ async function getOpenTabs() {
       id: t.id || 0,
       title: t.title || 'Untitled',
       url: t.url || '',
-      favIconUrl: t.favIconUrl
+      favIconUrl: t.favIconUrl,
+      lastAccessed: t.lastAccessed ?? Date.now(),
     }))
     .filter(t =>
       t.url &&
@@ -291,4 +299,27 @@ async function applyTabGroups(groups) {
   }
 
   throw new Error('Tab grouping is not supported in this browser');
+}
+
+async function applyCleanup(tabIdsToClose, groups) {
+  // 1. Close tabs first
+  if (tabIdsToClose && tabIdsToClose.length > 0) {
+    try {
+      await chrome.tabs.remove(tabIdsToClose);
+    } catch (err) {
+      // Some tabs may already be closed — not fatal
+      console.warn('[TabOrganizer BG] Some tabs already closed:', err.message);
+    }
+  }
+
+  // 2. Strip closed IDs from group proposals and apply
+  if (groups && groups.length > 0) {
+    const closedSet = new Set(tabIdsToClose || []);
+    const filteredGroups = groups
+      .map(g => ({ ...g, tabIds: g.tabIds.filter(id => !closedSet.has(id)) }))
+      .filter(g => g.tabIds.length > 0);
+    if (filteredGroups.length > 0) {
+      await applyTabGroups(filteredGroups);
+    }
+  }
 }
