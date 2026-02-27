@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, Loader2, Sparkles, CheckCircle, AlertTriangle, Layers, Settings as SettingsIcon } from 'lucide-react';
-import { getOpenTabs, applyTabGroups, getGroupingStrategy } from './services/tabManager';
+import { BrainCircuit, Loader2, Sparkles, CheckCircle, AlertTriangle, Layers, Settings as SettingsIcon, Trash2 } from 'lucide-react';
+import { getOpenTabs, applyCleanup, getGroupingStrategy } from './services/tabManager';
 import { categorizeTabs, checkAnalysisStatus, resetAnalysisStatus } from './services/aiService';
 import { loadSettings, saveSettings } from './services/settingsService';
+import { detectCleanupCandidates } from './services/cleanupService';
 import SettingsComponent from './components/Settings';
-import { Tab, TabGroupProposal, AppState, GroupingStrategy, Settings } from './types';
+import { Tab, TabGroupProposal, AppState, GroupingStrategy, Settings, CleanupCandidate } from './types';
 import GroupPreview from './components/GroupPreview';
+import CleanupList from './components/CleanupList';
+import ReviewTabs from './components/ReviewTabs';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
@@ -14,6 +17,9 @@ const App: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [strategy, setStrategy] = useState<GroupingStrategy | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [cleanupCandidates, setCleanupCandidates] = useState<CleanupCandidate[]>([]);
+  const [selectedCleanupIds, setSelectedCleanupIds] = useState<Set<number>>(new Set());
+  const [cleanupOnly, setCleanupOnly] = useState(false);
 
   // Initial load of tabs
   useEffect(() => {
@@ -44,6 +50,9 @@ const App: React.FC = () => {
           if (status === 'success' && proposals) {
             setProposals(proposals);
             setAppState(AppState.REVIEW);
+            const candidates = detectCleanupCandidates(tabs);
+            setCleanupCandidates(candidates);
+            setSelectedCleanupIds(new Set(candidates.map(c => c.tabId)));
             await resetAnalysisStatus();
           } else if (status === 'error') {
             setErrorMsg(error || 'Analysis failed.');
@@ -78,6 +87,9 @@ const App: React.FC = () => {
       if (groups && groups.length > 0) {
         setProposals(groups);
         setAppState(AppState.REVIEW);
+        const candidates = detectCleanupCandidates(tabs);
+        setCleanupCandidates(candidates);
+        setSelectedCleanupIds(new Set(candidates.map(c => c.tabId)));
       }
       // Otherwise, the interval will poll for the background result
     } catch (error) {
@@ -90,17 +102,19 @@ const App: React.FC = () => {
   const handleApply = async () => {
     setAppState(AppState.APPLYING);
     try {
-      await applyTabGroups(proposals);
+      const tabIdsToClose = [...selectedCleanupIds];
+      await applyCleanup(tabIdsToClose, cleanupOnly ? [] : proposals);
       setAppState(AppState.SUCCESS);
-
-      // Reset after a delay
       setTimeout(() => {
+        setCleanupOnly(false);
+        setCleanupCandidates([]);
+        setSelectedCleanupIds(new Set());
         setAppState(AppState.IDLE);
-        loadTabs(); // Reload to see new state if we were really connected
+        loadTabs();
       }, 2500);
     } catch (error) {
       console.error(error);
-      setErrorMsg("Failed to apply tab groups.");
+      setErrorMsg('Failed to apply changes.');
       setAppState(AppState.ERROR);
     }
   };
@@ -123,6 +137,40 @@ const App: React.FC = () => {
       console.error(error);
       setErrorMsg("Failed to save settings.");
       setAppState(AppState.ERROR);
+    }
+  };
+
+  const handleToggleCleanup = (tabId: number, selected: boolean) => {
+    setSelectedCleanupIds(prev => {
+      const next = new Set(prev);
+      if (selected) next.add(tabId); else next.delete(tabId);
+      return next;
+    });
+  };
+
+  const handleQuickCleanup = async () => {
+    setCleanupOnly(true);
+    setAppState(AppState.ANALYZING);
+    setErrorMsg('');
+    try {
+      const currentTabs = await getOpenTabs();
+      setTabs(currentTabs);
+      const candidates = detectCleanupCandidates(currentTabs);
+      setCleanupCandidates(candidates);
+      setSelectedCleanupIds(new Set(candidates.map(c => c.tabId)));
+      if (candidates.length === 0) {
+        setAppState(AppState.SUCCESS);
+        setTimeout(() => {
+          setCleanupOnly(false);
+          setAppState(AppState.IDLE);
+        }, 2000);
+      } else {
+        setAppState(AppState.REVIEW);
+      }
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Failed to scan tabs.');
+      setAppState(AppState.ERROR);
+      setCleanupOnly(false);
     }
   };
 
@@ -192,6 +240,13 @@ const App: React.FC = () => {
         <BrainCircuit size={18} />
         Generate Stacks
       </button>
+      <button
+        onClick={handleQuickCleanup}
+        className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition-all border border-slate-600 flex items-center justify-center gap-2 text-sm"
+      >
+        <Trash2 size={16} />
+        Quick Cleanup
+      </button>
     </div>
   );
 
@@ -203,47 +258,87 @@ const App: React.FC = () => {
     </div>
   );
 
-  const renderReview = () => (
-    <div className="flex flex-col h-full">
-      <div className="p-4 bg-slate-800/30 border-b border-slate-700">
-        <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-1">Proposed Stacks</h2>
-        <p className="text-xs text-slate-500">Review the groups before applying.</p>
-      </div>
+  const renderReview = () => {
+    const cleanupCount = selectedCleanupIds.size;
+    const applyLabel = (() => {
+      const hasGroups = !cleanupOnly && proposals.length > 0;
+      const hasCleanup = cleanupCount > 0;
+      if (hasGroups && hasCleanup) return `Apply Groups & Close ${cleanupCount} Tab${cleanupCount !== 1 ? 's' : ''}`;
+      if (hasCleanup) return `Close ${cleanupCount} Tab${cleanupCount !== 1 ? 's' : ''}`;
+      return 'Apply Stacks';
+    })();
 
-      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-        {proposals.map((group, idx) => (
-          <GroupPreview
-            key={`${group.groupName}-${idx}`}
-            proposal={group}
-            allTabs={tabs}
-            onRemoveTab={handleRemoveTabFromGroup}
-            showColors={strategy === 'chrome-groups' || strategy === null}
-          />
-        ))}
-      </div>
+    const reviewTabs = [
+      ...(!cleanupOnly ? [{ id: 'groups', label: 'Groups', count: proposals.length }] : []),
+      ...(cleanupCandidates.length > 0 ? [{ id: 'cleanup', label: 'Cleanup', count: cleanupCount }] : []),
+    ];
 
-      <div className="p-4 border-t border-slate-700 bg-slate-800 flex gap-3">
-        <button
-          onClick={() => setAppState(AppState.IDLE)}
-          className="flex-1 py-2 px-4 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors text-sm font-medium"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleApply}
-          className="flex-[2] py-2 px-4 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors shadow-lg shadow-green-900/20 text-sm font-medium"
-        >
-          Apply Stacks
-        </button>
+    const panes = [
+      ...(!cleanupOnly ? [(
+        <div className="p-4 space-y-0">
+          {proposals.map((group, idx) => (
+            <GroupPreview
+              key={`${group.groupName}-${idx}`}
+              proposal={group}
+              allTabs={tabs}
+              onRemoveTab={handleRemoveTabFromGroup}
+              showColors={strategy === 'chrome-groups' || strategy === null}
+            />
+          ))}
+        </div>
+      )] : []),
+      ...(cleanupCandidates.length > 0 ? [(
+        <CleanupList
+          candidates={cleanupCandidates}
+          allTabs={tabs}
+          onToggle={handleToggleCleanup}
+          selectedIds={selectedCleanupIds}
+        />
+      )] : []),
+    ];
+
+    const content = reviewTabs.length > 1
+      ? <ReviewTabs tabs={reviewTabs}>{panes}</ReviewTabs>
+      : <div className="flex-1 overflow-y-auto custom-scrollbar">{panes[0]}</div>;
+
+    return (
+      <div className="flex flex-col h-full">
+        <div className="p-4 bg-slate-800/30 border-b border-slate-700">
+          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-1">
+            {cleanupOnly ? 'Quick Cleanup' : 'Proposed Stacks'}
+          </h2>
+          <p className="text-xs text-slate-500">Review changes before applying.</p>
+        </div>
+
+        <div className="flex-1 overflow-hidden">
+          {content}
+        </div>
+
+        <div className="p-4 border-t border-slate-700 bg-slate-800 flex gap-3">
+          <button
+            onClick={() => { setAppState(AppState.IDLE); setCleanupOnly(false); }}
+            className="flex-1 py-2 px-4 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors text-sm font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleApply}
+            className="flex-[2] py-2 px-4 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors shadow-lg shadow-green-900/20 text-sm font-medium"
+          >
+            {applyLabel}
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderSuccess = () => (
     <div className="flex flex-col h-full justify-center items-center p-8 text-center space-y-4">
       <CheckCircle size={64} className="text-green-500" />
       <h3 className="text-xl font-bold">Tabs Organized!</h3>
-      <p className="text-sm text-slate-400">Your workspace has been tidied up.</p>
+      <p className="text-sm text-slate-400">
+        {cleanupOnly ? 'Stale and duplicate tabs closed.' : 'Your workspace has been tidied up.'}
+      </p>
     </div>
   );
 
