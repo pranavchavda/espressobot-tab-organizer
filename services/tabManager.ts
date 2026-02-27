@@ -40,7 +40,8 @@ export const getOpenTabs = async (): Promise<Tab[]> => {
           id: t.id || 0,
           title: t.title || 'Untitled',
           url: t.url || '',
-          favIconUrl: t.favIconUrl
+          favIconUrl: t.favIconUrl,
+          lastAccessed: t.lastAccessed ?? Date.now(),
         })).filter(t =>
           t.url &&
           !t.url.startsWith('chrome://') &&
@@ -100,4 +101,24 @@ export const applyTabGroups = async (groups: { groupName: string; tabIds: number
   // Fallback for web preview (mock)
   console.log('[TabOrganizer] Mock: Applying groups...', groups);
   await new Promise(resolve => setTimeout(resolve, 1000));
+};
+
+export const applyCleanup = async (
+  tabIdsToClose: number[],
+  groups: { groupName: string; tabIds: number[]; color: string }[]
+): Promise<void> => {
+  if (hasExtensionRuntime()) {
+    const response = await chrome.runtime.sendMessage({
+      action: 'applyCleanup',
+      tabIdsToClose,
+      groups,
+    });
+    if (!response?.success) {
+      throw new Error(response?.error || 'applyCleanup failed');
+    }
+    return;
+  }
+  // Web preview mock
+  console.log('[TabOrganizer] Mock applyCleanup:', { tabIdsToClose, groups });
+  await new Promise(resolve => setTimeout(resolve, 800));
 };
