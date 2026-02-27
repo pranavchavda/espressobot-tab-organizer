@@ -40,4 +40,4 @@ export interface CleanupCandidate {
   duplicateOfTabId?: number;  // tabId of the tab being kept
 }
 
-export const DEFAULT_MODEL = 'google/gemini-3.0-flash';
+export const DEFAULT_MODEL = 'google/gemini-2.5-flash';
