@@ -3,15 +3,16 @@ import { Tab, GroupingStrategy } from '../types';
 declare var chrome: any;
 
 // Mock data for web preview when chrome API is missing
+const NOW = Date.now();
 const MOCK_TABS: Tab[] = [
-  { id: 1, title: 'React Documentation', url: 'https://react.dev', favIconUrl: 'https://react.dev/favicon.ico' },
-  { id: 2, title: 'Tailwind CSS - Utility-First', url: 'https://tailwindcss.com', favIconUrl: 'https://tailwindcss.com/favicon.ico' },
-  { id: 3, title: 'YouTube - LoFi Girl', url: 'https://youtube.com/watch?v=5qap5aO4i9A', favIconUrl: 'https://www.youtube.com/s/desktop/favicon.ico' },
-  { id: 4, title: 'Gmail - Inbox (2)', url: 'https://mail.google.com', favIconUrl: 'https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico' },
-  { id: 5, title: 'Google Gemini API Docs', url: 'https://ai.google.dev', favIconUrl: 'https://www.gstatic.com/devrel-devsite/prod/v45f6/google/images/favicon.png' },
-  { id: 6, title: 'Stack Overflow - How to center div', url: 'https://stackoverflow.com/questions/12345', favIconUrl: 'https://cdn.sstatic.net/Sites/stackoverflow/Img/favicon.ico' },
-  { id: 7, title: 'Spotify - Web Player', url: 'https://open.spotify.com', favIconUrl: 'https://open.spotify.com/favicon.ico' },
-  { id: 8, title: 'GitHub - google/genai-js', url: 'https://github.com/google/genai-js', favIconUrl: 'https://github.com/fluidicon.png' },
+  { id: 1, title: 'React Documentation', url: 'https://react.dev', favIconUrl: 'https://react.dev/favicon.ico', lastAccessed: NOW - 5 * 60 * 1000 },
+  { id: 2, title: 'Tailwind CSS - Utility-First', url: 'https://tailwindcss.com', favIconUrl: 'https://tailwindcss.com/favicon.ico', lastAccessed: NOW - 20 * 60 * 1000 },
+  { id: 3, title: 'YouTube - LoFi Girl', url: 'https://youtube.com/watch?v=5qap5aO4i9A', favIconUrl: 'https://www.youtube.com/s/desktop/favicon.ico', lastAccessed: NOW - 3 * 60 * 60 * 1000 },
+  { id: 4, title: 'Gmail - Inbox (2)', url: 'https://mail.google.com', favIconUrl: 'https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico', lastAccessed: NOW - 10 * 60 * 1000 },
+  { id: 5, title: 'Google Gemini API Docs', url: 'https://ai.google.dev', favIconUrl: 'https://www.gstatic.com/devrel-devsite/prod/v45f6/google/images/favicon.png', lastAccessed: NOW - 8 * 60 * 60 * 1000 },
+  { id: 6, title: 'Stack Overflow - How to center div', url: 'https://stackoverflow.com/questions/12345', favIconUrl: 'https://cdn.sstatic.net/Sites/stackoverflow/Img/favicon.ico', lastAccessed: NOW - 25 * 60 * 60 * 1000 },
+  { id: 7, title: 'Spotify - Web Player', url: 'https://open.spotify.com', favIconUrl: 'https://open.spotify.com/favicon.ico', lastAccessed: NOW - 2 * 60 * 1000 },
+  { id: 8, title: 'GitHub - google/genai-js', url: 'https://github.com/google/genai-js', favIconUrl: 'https://github.com/fluidicon.png', lastAccessed: NOW - 4 * 60 * 60 * 1000 },
 ];
 
 // Check if we're in an extension context with service worker support
@@ -108,15 +109,21 @@ export const applyCleanup = async (
   groups: { groupName: string; tabIds: number[]; color: string }[]
 ): Promise<void> => {
   if (hasExtensionRuntime()) {
-    const response = await chrome.runtime.sendMessage({
-      action: 'applyCleanup',
-      tabIdsToClose,
-      groups,
-    });
-    if (!response?.success) {
-      throw new Error(response?.error || 'applyCleanup failed');
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'applyCleanup',
+        tabIdsToClose,
+        groups,
+      });
+      if (!response?.success) {
+        throw new Error(response?.error || 'applyCleanup failed');
+      }
+      return;
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error('[TabOrganizer] applyCleanup service worker error:', errMsg);
+      throw new Error(`Failed to apply cleanup: ${errMsg}`);
     }
-    return;
   }
   // Web preview mock
   console.log('[TabOrganizer] Mock applyCleanup:', { tabIdsToClose, groups });
