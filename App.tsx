@@ -28,11 +28,17 @@ const App: React.FC = () => {
     loadSettings().then(setSettings);
 
     // Check if there is an ongoing or finished background analysis
-    checkAnalysisStatus().then(({ status, proposals, error }) => {
+    checkAnalysisStatus().then(async ({ status, proposals, error }) => {
       if (status === 'analyzing') {
         setAppState(AppState.ANALYZING);
       } else if (status === 'success' && proposals && proposals.length > 0) {
+        // Fetch tabs fresh so detectCleanupCandidates has accurate data
+        const currentTabs = await getOpenTabs();
+        setTabs(currentTabs);
         setProposals(proposals);
+        const candidates = detectCleanupCandidates(currentTabs);
+        setCleanupCandidates(candidates);
+        setSelectedCleanupIds(new Set(candidates.map(c => c.tabId)));
         setAppState(AppState.REVIEW);
       } else if (status === 'error') {
         setErrorMsg(error || 'Failed to analyze tabs in background.');
@@ -109,6 +115,7 @@ const App: React.FC = () => {
         setCleanupOnly(false);
         setCleanupCandidates([]);
         setSelectedCleanupIds(new Set());
+        setProposals([]);
         setAppState(AppState.IDLE);
         loadTabs();
       }, 2500);
@@ -253,8 +260,12 @@ const App: React.FC = () => {
   const renderLoading = () => (
     <div className="flex flex-col h-full justify-center items-center p-8 text-center space-y-4">
       <Loader2 size={48} className="animate-spin text-blue-500" />
-      <h3 className="text-lg font-medium">Analyzing Context...</h3>
-      <p className="text-sm text-slate-400">AI is analyzing your tab titles and URLs to find patterns.</p>
+      <h3 className="text-lg font-medium">{cleanupOnly ? 'Scanning Tabs...' : 'Analyzing Context...'}</h3>
+      <p className="text-sm text-slate-400">
+        {cleanupOnly
+          ? 'Checking for stale and duplicate tabs.'
+          : 'AI is analyzing your tab titles and URLs to find patterns.'}
+      </p>
     </div>
   );
 
@@ -275,7 +286,7 @@ const App: React.FC = () => {
 
     const panes = [
       ...(!cleanupOnly ? [(
-        <div className="p-4 space-y-0">
+        <div className="p-4">
           {proposals.map((group, idx) => (
             <GroupPreview
               key={`${group.groupName}-${idx}`}
@@ -297,6 +308,9 @@ const App: React.FC = () => {
       )] : []),
     ];
 
+    // Invariant: panes[0] is always defined here.
+    // cleanupOnly=false always produces a groups pane; cleanupOnly=true only
+    // reaches REVIEW when candidates.length > 0 (handleQuickCleanup guards this).
     const content = reviewTabs.length > 1
       ? <ReviewTabs tabs={reviewTabs}>{panes}</ReviewTabs>
       : <div className="flex-1 overflow-y-auto custom-scrollbar">{panes[0]}</div>;
@@ -316,7 +330,7 @@ const App: React.FC = () => {
 
         <div className="p-4 border-t border-slate-700 bg-slate-800 flex gap-3">
           <button
-            onClick={() => { setAppState(AppState.IDLE); setCleanupOnly(false); }}
+            onClick={() => { setAppState(AppState.IDLE); setCleanupOnly(false); setCleanupCandidates([]); setSelectedCleanupIds(new Set()); }}
             className="flex-1 py-2 px-4 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors text-sm font-medium"
           >
             Cancel
