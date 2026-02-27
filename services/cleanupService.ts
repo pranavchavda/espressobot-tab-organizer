@@ -1,6 +1,6 @@
 import { Tab, CleanupCandidate } from '../types';
 
-const STALE_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
+export const STALE_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 export function detectCleanupCandidates(tabs: Tab[]): CleanupCandidate[] {
   const now = Date.now();
@@ -9,6 +9,7 @@ export function detectCleanupCandidates(tabs: Tab[]): CleanupCandidate[] {
   // --- Duplicate detection ---
   const byUrl = new Map<string, Tab[]>();
   for (const tab of tabs) {
+    if (!tab.url) continue;
     const key = tab.url;
     if (!byUrl.has(key)) byUrl.set(key, []);
     byUrl.get(key)!.push(tab);
@@ -16,7 +17,10 @@ export function detectCleanupCandidates(tabs: Tab[]): CleanupCandidate[] {
   for (const group of byUrl.values()) {
     if (group.length < 2) continue;
     // Keep the most recently accessed tab; flag the rest
-    const sorted = [...group].sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
+    const sorted = [...group].sort((a, b) => {
+      const timeDiff = (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0);
+      return timeDiff !== 0 ? timeDiff : b.id - a.id;
+    });
     const keeper = sorted[0];
     for (const tab of sorted.slice(1)) {
       candidates.set(tab.id, {
