@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { CleanupCandidate, Tab } from '../types';
 import { Layers } from 'lucide-react';
 
@@ -10,7 +10,9 @@ interface CleanupListProps {
 }
 
 function formatIdle(lastAccessed: number): string {
+  if (lastAccessed === 0) return 'idle (unknown)';
   const ms = Date.now() - lastAccessed;
+  if (ms < 0) return 'idle 0m';
   const mins = Math.floor(ms / 60_000);
   if (mins < 60) return `idle ${mins}m`;
   const hours = Math.floor(mins / 60);
@@ -26,7 +28,10 @@ const REASON_BADGE: Record<CleanupCandidate['reason'], { label: string; classNam
 };
 
 const CleanupList: React.FC<CleanupListProps> = ({ candidates, allTabs, onToggle, selectedIds }) => {
-  const tabById = new Map<number, Tab>(allTabs.map(t => [t.id, t]));
+  const tabById = useMemo(
+    () => new Map<number, Tab>(allTabs.map(t => [t.id, t])),
+    [allTabs]
+  );
 
   if (candidates.length === 0) {
     return (
@@ -79,7 +84,7 @@ const CleanupList: React.FC<CleanupListProps> = ({ candidates, allTabs, onToggle
                   <span className="text-[10px] text-slate-500">{formatIdle(candidate.lastAccessed)}</span>
                 )}
                 {keeperTab && (
-                  <span className="text-[10px] text-slate-500">keeping: {keeperTab.title}</span>
+                  <span className="text-[10px] text-slate-500 max-w-[120px] truncate">keeping: {keeperTab.title}</span>
                 )}
               </div>
             </div>
