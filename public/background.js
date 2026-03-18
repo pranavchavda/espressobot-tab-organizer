@@ -9,8 +9,8 @@ let analysisProposals = [];
 let analysisError = '';
 
 async function detectStrategy() {
-  // Chrome/Edge: chrome.tabGroups API exists
-  if (typeof chrome.tabGroups !== 'undefined') {
+  // Chrome/Edge: chrome.tabs.group() function exists (works even without tabGroups permission)
+  if (typeof chrome.tabs.group === 'function') {
     groupingStrategy = 'chrome-groups';
     console.log('[TabOrganizer BG] Detected strategy:', groupingStrategy);
     return;
