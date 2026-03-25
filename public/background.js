@@ -9,24 +9,27 @@ let analysisProposals = [];
 let analysisError = '';
 
 async function detectStrategy() {
-  // Chrome/Edge: chrome.tabs.group() function exists (works even without tabGroups permission)
+  // Vivaldi check FIRST: Vivaldi is Chromium-based so chrome.tabs.group exists,
+  // but we need to use Vivaldi's native tab stacking instead
+  try {
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    if (tabs.length > 0 && 'splitViewId' in tabs[0]) {
+      groupingStrategy = 'vivaldi-stacks';
+      console.log('[TabOrganizer BG] Detected strategy:', groupingStrategy);
+      return;
+    }
+  } catch {
+    // Fall through to Chrome/Edge check
+  }
+
+  // Chrome/Edge: chrome.tabs.group() function exists
   if (typeof chrome.tabs.group === 'function') {
     groupingStrategy = 'chrome-groups';
     console.log('[TabOrganizer BG] Detected strategy:', groupingStrategy);
     return;
   }
 
-  // Vivaldi: tabs have splitViewId (Vivaldi-only property)
-  try {
-    const tabs = await chrome.tabs.query({ currentWindow: true });
-    if (tabs.length > 0 && 'splitViewId' in tabs[0]) {
-      groupingStrategy = 'vivaldi-stacks';
-    } else {
-      groupingStrategy = 'unsupported';
-    }
-  } catch {
-    groupingStrategy = 'unsupported';
-  }
+  groupingStrategy = 'unsupported';
   console.log('[TabOrganizer BG] Detected strategy:', groupingStrategy);
 }
 
