@@ -37,13 +37,15 @@ export const getOpenTabs = async (): Promise<Tab[]> => {
   if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
     return new Promise((resolve) => {
       chrome.tabs.query({ currentWindow: true, pinned: false }, (tabs: any[]) => {
-        const mappedTabs = tabs.map((t) => ({
-          id: t.id || 0,
-          title: t.title || 'Untitled',
-          url: t.url || '',
-          favIconUrl: t.favIconUrl,
-          lastAccessed: t.lastAccessed ?? Date.now(),
-        })).filter(t =>
+        const mappedTabs = tabs
+          .filter((t) => !t.hidden)
+          .map((t) => ({
+            id: t.id || 0,
+            title: t.title || 'Untitled',
+            url: t.url || '',
+            favIconUrl: t.favIconUrl,
+            lastAccessed: t.lastAccessed ?? Date.now(),
+          })).filter(t =>
           t.url &&
           !t.url.startsWith('chrome://') &&
           !t.url.startsWith('edge://') &&

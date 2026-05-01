@@ -190,6 +190,7 @@ async function categorizeTabsAI(tabs, settings) {
 async function getOpenTabs() {
   const tabs = await chrome.tabs.query({ currentWindow: true, pinned: false });
   return tabs
+    .filter((t) => !t.hidden)
     .map((t) => ({
       id: t.id || 0,
       title: t.title || 'Untitled',
